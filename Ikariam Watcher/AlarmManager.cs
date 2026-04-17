@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Globalization;
 using System.Timers;
 
 namespace IkariamWatcher
@@ -30,6 +31,30 @@ namespace IkariamWatcher
         // pattern matching real window title timers: optional hours, mandatory minutes, optional seconds
         // examples matched: "38m 55s", "01h 39m 46s", "19m 13s"
         private readonly Regex _timeRegex = new(@"(?:(\d{1,2})h\s*)?(\d{1,2})m(?:\s*(\d{1,2})s)?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        // Normalize window titles: strip Unicode format/control chars and trim
+        private static string NormalizeTitle(string? title)
+        {
+            if (string.IsNullOrEmpty(title)) return string.Empty;
+            var sb = new StringBuilder(title.Length);
+            foreach (var c in title)
+            {
+                var cat = CharUnicodeInfo.GetUnicodeCategory(c);
+                // Remove control and format characters (e.g. bidi markers) which can hide text
+                if (cat == UnicodeCategory.Control || cat == UnicodeCategory.Format)
+                    continue;
+
+                sb.Append(c);
+            }
+
+            return sb.ToString().Trim();
+        }
+
+        private static bool IsIkariamTitle(string title)
+        {
+            if (string.IsNullOrEmpty(title)) return false;
+            return title.IndexOf("Ikariam", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
 
         public event EventHandler? ActiveAlarmsChanged;
         public event EventHandler<Alarm>? AlarmFired;
@@ -111,9 +136,16 @@ namespace IkariamWatcher
                 if (len == 0) return true;
                 var sb = new StringBuilder(len + 1);
                 GetWindowText(hwnd, sb, sb.Capacity);
-                var title = sb.ToString();
+                var rawTitle = sb.ToString();
                 scanned++;
+                // normalize to remove hidden formatting characters and whitespace
+                var title = NormalizeTitle(rawTitle);
                 titles.Add(title);
+
+                // Only consider windows that appear to be Ikariam windows after normalization
+                if (!IsIkariamTitle(title))
+                    return true;
+
                 var match = _timeRegex.Match(title);
                 if (match.Success)
                 {

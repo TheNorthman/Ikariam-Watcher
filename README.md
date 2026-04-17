@@ -29,11 +29,24 @@ dotnet run --project "Ikariam Watcher\Ikariam Watcher.csproj"
 Usage
 - The app lives in the system tray. Right-click the tray icon to toggle `Enable`, `Play sound`, and `Show notification`, or to `Exit` the app.
 - When an alarm fires and `Show notification` is enabled the app shows a balloon tip. When `Play sound` is enabled the system exclamation sound is played.
+- The tray tooltip lines show the world and city when available in the format: `{world} ({city}) - {alarm info}`. If no city is present the format falls back to `{world} - {alarm info}`.
 
 Notes for developers
 - Project language: C# 14 targeting .NET 10 (WPF/WinForms enabled).
 - The tray icon is loaded from the embedded resource `favicon.ico` (ApplicationIcon is set in the project file).
 - Alarm logic lives in `AlarmManager.cs`. Tray behavior and user toggles are handled in `TrayApplicationContext.cs`.
+
+Ikariam v17 title handling
+- Recent Ikariam (v17) titles may include hidden Unicode formatting/control characters (for example bidi markers) which could hide or alter the visible text. To avoid false positives the watcher now:
+  - Normalizes window titles by stripping Unicode control/format characters and trimming whitespace before any parsing or display.
+  - Only attempts to parse countdowns from titles that contain the word "Ikariam" after normalization.
+  - Continues to use the existing countdown regex `(?:(\d{1,2})h\s*)?(\d{1,2})m(?:\s*(\d{1,2})s)?` but applied to the normalized title.
+
+Developer verification
+- Build the solution and run the app.
+- Open an Ikariam v17 browser/game window with a title like: `Ikariam - 01h 38m 16s (Rayong) - World Theseus` and confirm it is detected.
+- Open a non-Ikariam window that happens to include text matching the countdown pattern and confirm it is ignored.
+- Tray tooltips and notifications should show normalized text with no hidden formatting characters.
 
 Contributing
 - Fork, create a branch, add changes and open a pull request.

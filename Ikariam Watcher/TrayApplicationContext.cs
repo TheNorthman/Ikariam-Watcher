@@ -20,6 +20,8 @@ namespace IkariamWatcher
 
         private static readonly Regex _titleTimeRegex = new(@"(?:(\d{1,2})h\s*)?(\d{1,2})m(?:\s*(\d{1,2})s)?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex _worldNameRegex = new(@"World\s+([^\-–:()]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        // captures first parenthesized value (commonly used for city names)
+        private static readonly Regex _cityRegex = new(@"\(([^\)]+)\)", RegexOptions.Compiled);
 
         public TrayApplicationContext()
         {
@@ -123,6 +125,16 @@ namespace IkariamWatcher
                         world = world.TrimEnd('-', '–', ':', ' ');
                     }
 
+                    // extract city from parentheses if present and remove it from world string
+                    string city = string.Empty;
+                    var cityMatch = _cityRegex.Match(world);
+                    if (cityMatch.Success)
+                    {
+                        city = cityMatch.Groups[1].Value.Trim();
+                        world = world.Remove(cityMatch.Index, cityMatch.Length).Trim();
+                        world = world.TrimEnd('-', '–', ':', ' ');
+                    }
+
                     var worldMatch = _worldNameRegex.Match(world);
                     if (worldMatch.Success)
                         world = worldMatch.Groups[1].Value.Trim();
@@ -138,9 +150,13 @@ namespace IkariamWatcher
 
                     if (string.IsNullOrEmpty(world)) world = "Unknown";
 
-                    var line = string.IsNullOrEmpty(countdown)
-                        ? $"{world} - ({FormatRemaining(a)})"
-                        : $"{world} - {countdown} ({FormatRemaining(a)})";
+                    var alarmInfo = string.IsNullOrEmpty(countdown)
+                        ? $"({FormatRemaining(a)})"
+                        : $"{countdown} ({FormatRemaining(a)})";
+
+                    var line = string.IsNullOrEmpty(city)
+                        ? $"{world} - {alarmInfo}"
+                        : $"{world} ({city}) - {alarmInfo}";
 
                     lines.Add(line);
                 }
